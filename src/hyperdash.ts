@@ -8,7 +8,7 @@ import type {
   AllDexsClearinghouseStateMessage,
   SpotBalance,
 } from "./api/types.hyperdash";
-import { traderStore } from "./ui/updater";
+import { balanceStore, traderStore } from "./ui/updater";
 export const COIN_PRICE: Record<string, number> = {};
 export class HyperDash {
   walletAddress: string;
@@ -30,11 +30,12 @@ export class HyperDash {
         case "spotState":
           const spotData = parseWebsocketMessage(msg, "spotState");
           //only balance matters
+          balanceStore.setState(spotData.spotState.balances);
           let str = ``;
           for (const balance of spotData.spotState.balances) {
             str += `${balance.coin}: ${balance.total} (hold: ${balance.hold}) | token: ${balance.token} | entry: ${balance.entryNtl}\n`;
           }
-          //console.log("📊 Balance Updates:\n", str);
+          console.log("📊 Balance Updates:\n", str);
           break;
         case "pong":
           //console.log("🏓 Pong received");
@@ -86,7 +87,7 @@ export class HyperDash {
       method: "subscribe",
       subscription: {
         type: "spotState",
-        user: "0x8434b7844fd17fad52f0aceae50a834cd4896577",
+        user: this.walletAddress,
         ignorePortfolioMargin: false,
       },
     });
@@ -96,7 +97,7 @@ export class HyperDash {
       method: "subscribe",
       subscription: {
         type: "allDexsClearinghouseState",
-        user: "0x8434b7844fd17fad52f0aceae50a834cd4896577",
+        user: this.walletAddress,
       },
     });
 

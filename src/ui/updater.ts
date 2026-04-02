@@ -1,25 +1,49 @@
-import type { Position } from "../api/types.hyperdash";
+import type { Balance, Position } from "../api/types.hyperdash";
 
-type Trader = {
+type TraderState = {
   positions: Position[];
 };
 
-let state: Trader = {
+let traderState: TraderState = {
   positions: [],
 };
 
+let balanceState: Balance[] = [];
+
 const listeners = new Set<() => void>();
 
+const emit = () => listeners.forEach((l) => l());
+
+// ---------- trader ----------
 export const traderStore = {
-  getState: () => state,
+  getState: () => traderState,
 
-  setState: (newState: Partial<Trader>) => {
-    state = { ...state, ...newState };
-    listeners.forEach((l) => l());
+  setState: (partial: Partial<TraderState>) => {
+    traderState = { ...traderState, ...partial };
+    emit();
   },
 
-  subscribe: (listener: () => void) => {
-    listeners.add(listener);
-    return () => listeners.delete(listener);
+  subscribe: (fn: () => void) => {
+    listeners.add(fn);
+    return () => listeners.delete(fn);
   },
+};
+
+// ---------- balances ----------
+export const balanceStore = {
+  getState: () => balanceState,
+
+  setState: (balances: Balance[]) => {
+    balanceState = balances;
+    emit();
+  },
+
+  updateOne: (coin: string, patch: Partial<Balance>) => {
+    balanceState = balanceState.map((b) =>
+      b.coin === coin ? { ...b, ...patch } : b
+    );
+    emit();
+  },
+
+  subscribe: traderStore.subscribe,
 };

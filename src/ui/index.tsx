@@ -1,144 +1,170 @@
 #!/usr/bin/env bun
 
-import React, { useState, useEffect } from "react";
-import { render, Text, Box } from "ink";
-import type { Position } from "../api/types.hyperdash";
-
-type Trader = {
-  positions: Position[];
-};
-import { traderStore } from "./updater";
+import React, { useEffect, useState } from "react";
+import { render, Box, Text } from "ink";
+import type { Position, Balance } from "../api/types.hyperdash";
+import { traderStore, balanceStore } from "./updater";
 import { COIN_PRICE } from "../hyperdash";
 
-const fmt = (v?: string | number | null, lim?: number) =>
-  v === null || v === undefined
+const fmt = (v?: string | number | null, d = 2) =>
+  v == null
     ? "-"
     : Number(v).toLocaleString("en-US", {
-        maximumFractionDigits: lim ?? 7,
+        maximumFractionDigits: d,
       });
 
-const colorPnL = (v: string) => (Number(v) >= 0 ? "green" : "red");
+const pnlColor = (v: number) => (v >= 0 ? "green" : "red");
+
+const col = (
+  value: string,
+  width: number,
+  align: "left" | "right" = "right",
+) => {
+  if (value.length > width) return value.slice(0, width);
+
+  const pad = " ".repeat(width - value.length);
+  return align === "right" ? pad + value : value + pad;
+};
 
 const Header = () => (
-  <Box>
-    <Box width={12}>
-      <Text>ASSET</Text>
-    </Box>
-    <Box width={8} justifyContent="flex-end">
-      <Text>SIZE</Text>
-    </Box>
-    <Box width={14} justifyContent="flex-end">
-      <Text>VALUE</Text>
-    </Box>
-    <Box width={12} justifyContent="flex-end">
-      <Text>ENTRY</Text>
-    </Box>
-    <Box width={25} justifyContent="flex-end">
-      <Text>PNL</Text>
-    </Box>
-    <Box width={12} justifyContent="flex-end">
-      <Text>MARK</Text>
-    </Box>
-    <Box width={12} justifyContent="flex-end">
-      <Text>MARGIN</Text>
-    </Box>
-    {/*
-      <Box width={12}>
-        <Text>FUNDING</Text>
-      </Box>
-    */}
-  </Box>
+  <Text color="cyan">
+    {[
+      col("ASSET", 12, "left"),
+      col("SIZE", 10),
+      col("VALUE", 16),
+      col("ENTRY", 12),
+      col("MARK", 12),
+      col("PNL", 26),
+      col("MARGIN", 14),
+    ].join(" ")}
+  </Text>
 );
 
 const Row = ({ p }: { p: Position }) => {
   const pnl = Number(p.unrealizedPnl);
-  const funding = Number(p.cumFunding?.allTime ?? 0);
   const size = Number(p.szi);
+
+  const asset = `x${p.leverage.value} ${p.coin.split(":").pop()}`;
+  const pnlPct = (pnl / Number(p.marginUsed)) * 100;
+
   return (
     <Box>
-      <Box width={12}>
-        <Text bold color={size >= 0 ? "green" : "red"}>
-          {`x${p.leverage.value} ` +
-            (p.coin.includes(":") ? p.coin.split(":")[1] : p.coin)}
-        </Text>
-      </Box>
+      <Text color={size >= 0 ? "green" : "red"}>{col(asset, 15, "left")}</Text>
 
-      <Box width={8} justifyContent="flex-end">
-        <Text>{fmt(Math.abs(size), 3)}</Text>
-      </Box>
+      <Text>{col(fmt(Math.abs(size), 3), 10)}</Text>
 
-      <Box width={14} justifyContent="flex-end">
-        <Text>${fmt(p.positionValue, 2)}</Text>
-      </Box>
+      <Text color={Number(p.positionValue) >= 0 ? "green" : "red"}>
+        {col(`$${fmt(p.positionValue)}`, 16)}
+      </Text>
 
-      <Box width={12}justifyContent="flex-end">
-        <Text>${fmt(p.entryPx)}</Text>
-      </Box>
+      <Text>{col(`$${fmt(p.entryPx)}`, 12)}</Text>
+      <Text>{col(`$${fmt(COIN_PRICE[p.coin])}`, 12)}</Text>
 
-      <Box width={25} justifyContent="flex-end">
-        <Text color={colorPnL(p.unrealizedPnl)}>
-          {pnl >= 0 ? "+" : "-"}${fmt(Math.abs(Number(p.unrealizedPnl)), 3)} {`(${pnl>=0 ? "+" : ""}${fmt(100*pnl/Number(p.marginUsed), 2)}%)`}
-        </Text>
-      </Box>
+      <Text color={pnl >= 0 ? "green" : "red"}>
+        {col(
+          `${pnl >= 0 ? "+" : "-"}${fmt(Math.abs(pnl))} (${fmt(pnlPct)}%)`,
+          26,
+        )}
+      </Text>
 
-      <Box width={12} justifyContent="flex-end">
-        <Text>${fmt(COIN_PRICE[p.coin])}</Text>
-      </Box>
-
-      <Box width={12} justifyContent="flex-end">
-        <Text>${fmt(p.marginUsed, 2)}</Text>
-      </Box>
-
-      {/*<Box width={12}>
-        <Text color={funding >= 0 ? "green" : "red"}>
-          {funding >= 0 ? "+" : ""}${fmt(funding, 2)}
-        </Text> 
-      </Box>*/}
+      <Text>{col(`$${fmt(p.marginUsed)}`, 14)}</Text>
     </Box>
   );
 };
 
-const Table = ({ positions }: { positions: Position[] }) => {
+// ---------- table ----------
+const Table = ({ positions }: { positions: Position[] }) => (
+  <Box flexDirection="column">
+    <Header />
+    <Text dimColor>{"-".repeat(110)}</Text>
+
+    {positions.map((p, i) => (
+      <Row key={i} p={p} />
+    ))}
+  </Box>
+);
+
+const Portfolio = ({ positions }: { positions: Position[] }) => {
+  const [balances, setBalances] = useState<Balance[]>(balanceStore.getState());
+//@ts-ignore
+  useEffect(() => {
+    return balanceStore.subscribe(() => setBalances(balanceStore.getState()));
+  }, []);
+
+  const totalBalance = balances.reduce((a, b) => a + Number(b.total), 0);
+
+  const totalPnL = positions.reduce((a, p) => a + Number(p.unrealizedPnl), 0);
+
   return (
-    <Box flexDirection="column">
-      <Header />
-      <Box marginBottom={1}>
-        <Text dimColor>
-          ───────────────────────────────────────────────────────────────────────────────────────────────────
-        </Text>
-      </Box>
+    <Box
+      flexDirection="column"
+      borderStyle="round"
+      borderColor="red"
+      padding={1}
+      width={32}
+    >
+      <Text bold>Portfolio</Text>
 
-      {positions.map((p, i) => (
-        <Row key={i} p={p} />
-      ))}
+      <Box marginTop={1} flexDirection="column">
+        <Text>
+          Value: <Text color="cyan">${fmt(totalBalance)}</Text>
+        </Text>
+
+        <Text>
+          PnL:{" "}
+          <Text color={pnlColor(totalPnL)}>
+            {totalPnL >= 0 ? "+" : ""}${fmt(totalPnL)}
+          </Text>
+        </Text>
+
+        <Text dimColor>Positions: {positions.length}</Text>
+      </Box>
     </Box>
   );
 };
+
+const Live = () => (
+  <Box
+    marginTop={1}
+    borderStyle="round"
+    borderColor="red"
+    height={8}
+    padding={1}
+	width={50}
+  >
+    <Text dimColor>Live Updates (plug websocket events here)</Text>
+  </Box>
+);
 
 const App = () => {
-  const [trader, setTrader] = useState(traderStore.getState());
+  const [state, setState] = useState(traderStore.getState());
 
   //@ts-ignore
   useEffect(() => {
-    return traderStore.subscribe(() => {
-      setTrader(traderStore.getState());
-    });
+    return traderStore.subscribe(() => setState(traderStore.getState()));
   }, []);
-
 
   return (
     <Box flexDirection="column" padding={1}>
       <Text bold color="cyan">
-        POSITIONS ({trader.positions.length})
+        POSITIONS ({state.positions.length})
       </Text>
 
       <Box marginTop={1}>
-        <Table positions={trader.positions} />
+        {/* LEFT */}
+        <Box  marginRight={2}>
+          <Box borderStyle="round" borderColor="cyan" padding={1}>
+            <Table positions={state.positions} />
+          </Box>
+        </Box>
+
+        {/* RIGHT */}
+        <Portfolio positions={state.positions} />
       </Box>
+
+      <Live />
     </Box>
   );
 };
 
-export function loadUI() {
-  render(<App />);
-}
+export const loadUI = () => render(<App />);
