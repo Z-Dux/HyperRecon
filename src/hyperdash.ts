@@ -8,7 +8,8 @@ import type {
   AllDexsClearinghouseStateMessage,
   SpotBalance,
 } from "./api/types.hyperdash";
-
+import { traderStore } from "./ui/updater";
+export const COIN_PRICE: Record<string, number> = {};
 export class HyperDash {
   walletAddress: string;
   constructor(address: string) {
@@ -48,14 +49,23 @@ export class HyperDash {
             if (state.assetPositions.length > 0) {
               logs.push(
                 state.assetPositions.map(
-                  (pos) =>
-                    `$${pos.position.coin.includes(":") ? pos.position.coin.split(":")[1] : pos.position.coin} | Entry: ${Number(pos.position.entryPx).toFixed(2)} | Size: ${Number(pos.position.szi).toFixed(2)} x${pos.position.leverage.value} | Value: ${Number(pos.position.positionValue).toFixed(2)} | Unrealized PnL: ${Number(pos.position.unrealizedPnl).toFixed(2)} | ROE: ${Number(pos.position.returnOnEquity).toFixed(2)}% | Liquidation Price: ${pos.position.liquidationPx ? Number(pos.position.liquidationPx).toFixed(2) : "N/A"} | Margin Used: ${Number(pos.position.marginUsed).toFixed(2)} | Max Leverage: ${pos.position.maxLeverage} | Cum Funding: ${Number(pos.position.cumFunding.allTime).toFixed(2)}`,
+                  (pos) => pos.position,
+                  //`$${pos.position.coin.includes(":") ? pos.position.coin.split(":")[1] : pos.position.coin} | Entry: ${Number(pos.position.entryPx).toFixed(2)} | Size: ${Number(pos.position.szi).toFixed(2)} x${pos.position.leverage.value} | Value: ${Number(pos.position.positionValue).toFixed(2)} | Unrealized PnL: ${Number(pos.position.unrealizedPnl).toFixed(2)} | ROE: ${Number(pos.position.returnOnEquity).toFixed(2)}% | Liquidation Price: ${pos.position.liquidationPx ? Number(pos.position.liquidationPx).toFixed(2) : "N/A"} | Margin Used: ${Number(pos.position.marginUsed).toFixed(2)} | Max Leverage: ${pos.position.maxLeverage} | Cum Funding: ${Number(pos.position.cumFunding.allTime).toFixed(2)}`,
                 ),
               );
             }
           }
-          console.log(`📊 Clearinghouse Updates:`);
-          logs.flat().forEach((log) => console.log(log));
+
+          traderStore.setState({
+            positions: logs.flat(),
+          });
+
+          break;
+        case "allMids":
+          const mids = msg.data.mids as Array<Record<string, string>>;
+          for (const [coin, price] of Object.entries(mids)) {
+            COIN_PRICE[coin] = Number(price);
+          }
           break;
         default:
           console.log("🔻", msg.channel, msg);
@@ -88,6 +98,12 @@ export class HyperDash {
         type: "allDexsClearinghouseState",
         user: "0x8434b7844fd17fad52f0aceae50a834cd4896577",
       },
+    });
+
+    //get price
+    ws.send({
+      method: "subscribe",
+      subscription: { type: "allMids", dex: "ALL_DEXS" },
     });
   }
 }

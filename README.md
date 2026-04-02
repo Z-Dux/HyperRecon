@@ -1,4 +1,9 @@
-# hyperrecon
+# HyperRecon
+
+A personal tool to track crypto wallets of top traders and scrape live trade signals from social media & produce aggregated market sentiment
+
+Uses react + ink for CLI UI and raw Bun/TS for interaction
+
 
 To install dependencies:
 
