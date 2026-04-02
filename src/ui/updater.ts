@@ -1,4 +1,4 @@
-import type { Balance, Position } from "../api/types.hyperdash";
+import type { Balance, Position, OpenOrder } from "../api/types.hyperdash";
 
 type TraderState = {
   positions: Position[];
@@ -14,7 +14,6 @@ const listeners = new Set<() => void>();
 
 const emit = () => listeners.forEach((l) => l());
 
-// ---------- trader ----------
 export const traderStore = {
   getState: () => traderState,
 
@@ -29,7 +28,6 @@ export const traderStore = {
   },
 };
 
-// ---------- balances ----------
 export const balanceStore = {
   getState: () => balanceState,
 
@@ -42,6 +40,20 @@ export const balanceStore = {
     balanceState = balanceState.map((b) =>
       b.coin === coin ? { ...b, ...patch } : b
     );
+    emit();
+  },
+
+  subscribe: traderStore.subscribe,
+};
+
+
+let openOrdersState: OpenOrder[] = [];
+
+export const openOrdersStore = {
+  getState: () => openOrdersState,
+
+  setState: (orders: OpenOrder[]) => {
+    openOrdersState = orders;
     emit();
   },
 

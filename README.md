@@ -4,6 +4,8 @@ A personal tool to track crypto wallets of top traders and scrape live trade sig
 
 Uses react + ink for CLI UI and raw Bun/TS for interaction
 
+![HyperRecon](src/assets/v1.png)    
+
 
 To install dependencies:
 

@@ -129,3 +129,40 @@ export interface Balance {
 
 // ---- Tuple type for token availability ----
 export type TokenAvailability = [token: number, available: NumericString];
+
+// ---- Open Orders ----
+
+export interface OpenOrder {
+  coin: string;
+  side: "B" | "S";
+  limitPx: NumericString;
+  sz: NumericString;
+  oid: number;
+  timestamp: number;
+
+  triggerCondition: string;
+  isTrigger: boolean;
+  triggerPx: NumericString;
+
+  children: unknown[];
+
+  isPositionTpsl: boolean;
+  reduceOnly: boolean;
+
+  orderType: string;
+  origSz: NumericString;
+
+  tif: string;
+  cloid: string | null;
+}
+
+export interface OpenOrdersData {
+  dex: string;
+  user: string;
+  orders: OpenOrder[];
+}
+
+export interface OpenOrdersMessage {
+  channel: "openOrders";
+  data: OpenOrdersData;
+}

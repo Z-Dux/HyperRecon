@@ -6,9 +6,10 @@ import {
 import type {
   AccountInfo,
   AllDexsClearinghouseStateMessage,
+  OpenOrder,
   SpotBalance,
 } from "./api/types.hyperdash";
-import { balanceStore, traderStore } from "./ui/updater";
+import { balanceStore, openOrdersStore, traderStore } from "./ui/updater";
 export const COIN_PRICE: Record<string, number> = {};
 export class HyperDash {
   walletAddress: string;
@@ -35,7 +36,7 @@ export class HyperDash {
           for (const balance of spotData.spotState.balances) {
             str += `${balance.coin}: ${balance.total} (hold: ${balance.hold}) | token: ${balance.token} | entry: ${balance.entryNtl}\n`;
           }
-          console.log("📊 Balance Updates:\n", str);
+          //console.log("📊 Balance Updates:\n", str);
           break;
         case "pong":
           //console.log("🏓 Pong received");
@@ -68,6 +69,10 @@ export class HyperDash {
             COIN_PRICE[coin] = Number(price);
           }
           break;
+        case "openOrders":
+          const openOrdersData = msg.data.orders as OpenOrder[];
+          openOrdersStore.setState(openOrdersData);
+          return;
         default:
           console.log("🔻", msg.channel, msg);
 
@@ -105,6 +110,15 @@ export class HyperDash {
     ws.send({
       method: "subscribe",
       subscription: { type: "allMids", dex: "ALL_DEXS" },
+    });
+    //open orders
+    ws.send({
+      method: "subscribe",
+      subscription: {
+        type: "openOrders",
+        user: this.walletAddress,
+        dex: "ALL_DEXS",
+      },
     });
   }
 }
