@@ -1,3 +1,4 @@
+import { notify } from "./ui/notifications";
 import {
   connectHyperLiquid,
   getAccountInfo,
@@ -12,8 +13,14 @@ import type {
   WsUserFills,
 } from "./api/types.hyperdash";
 import type { UIOrder } from "./ui/updater";
-import { balanceStore, fillsStore, openOrdersStore, traderStore } from "./ui/updater";
+import {
+  balanceStore,
+  fillsStore,
+  openOrdersStore,
+  traderStore,
+} from "./ui/updater";
 export const COIN_PRICE: Record<string, number> = {};
+let init = false
 export class HyperDash {
   walletAddress: string;
   orders: OpenOrder[] = [];
@@ -87,6 +94,21 @@ export class HyperDash {
           ); //, userFillsData.fills);
           this.orderFills = userFillsData.fills;
           fillsStore.addFills(userFillsData.fills);
+          if (init == false) return (init = true);
+          for (const fill of userFillsData.fills) {
+            const asset = fill.coin.split(":").pop();
+            const size = Number(fill.sz);
+            const price = Number(fill.px);
+
+            if (fill.closedPnl !== "0") {
+              notify(
+                "FILL_CLOSE",
+                `${asset} CLOSED | Sz: ${size} | Px: ${price} | PnL: ${fill.closedPnl}`,
+              );
+            } else {
+              notify("FILL_OPEN", `${asset} OPEN | Sz: ${size} | Px: ${price}`);
+            }
+          }
           return;
         default:
           console.log("🔻", msg.channel, msg);
@@ -232,13 +254,20 @@ export class HyperDash {
         if (idx !== -1) removedOrders.splice(idx, 1);
       } else {
         console.log(`🆕 New Order: ${order.coin} | OID: ${oid}`);
-
+        notify(
+          "NEW_ORDER",
+          `${order.coin} ${order.side === "B" ? "BUY" : "SELL"} | Sz: ${order.sz} | Px: ${order.limitPx}`,
+        );
         enrichedOrders.push(order);
       }
     }
 
     for (const order of removedOrders) {
       console.log(`❌ Order Removed: ${order.coin} | OID: ${order.oid}`);
+      notify(
+        "ORDER_CANCEL",
+        `${order.coin} ${order.side === "B" ? "BUY" : "SELL"} | OID: ${order.oid}`,
+      );
     }
 
     this.orders = [...orders];
