@@ -1,4 +1,9 @@
-import type { Balance, Position, OpenOrder } from "../api/types.hyperdash";
+import type {
+  Balance,
+  Position,
+  OpenOrder,
+  WsFill,
+} from "../api/types.hyperdash";
 
 export type UIOrder = OpenOrder & {
   changed?: {
@@ -14,6 +19,7 @@ type TraderState = {
 let traderState: TraderState = {
   positions: [],
 };
+let fillsState: WsFill[] = [];
 
 let balanceState: Balance[] = [];
 
@@ -47,7 +53,7 @@ export const balanceStore = {
 
   updateOne: (coin: string, patch: Partial<Balance>) => {
     balanceState = balanceState.map((b) =>
-      b.coin === coin ? { ...b, ...patch } : b
+      b.coin === coin ? { ...b, ...patch } : b,
     );
     emit();
   },
@@ -60,6 +66,21 @@ export const openOrdersStore = {
 
   setState: (orders: UIOrder[]) => {
     openOrdersState = orders;
+    emit();
+  },
+
+  subscribe: traderStore.subscribe,
+};
+export const fillsStore = {
+  getState: () => fillsState,
+
+  setState: (fills: WsFill[]) => {
+    fillsState = fills;
+    emit();
+  },
+
+  addFills: (newFills: WsFill[]) => {
+    fillsState = [...newFills, ...fillsState].slice(0, 50);
     emit();
   },
 

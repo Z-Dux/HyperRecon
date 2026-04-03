@@ -12,7 +12,7 @@ import type {
   WsUserFills,
 } from "./api/types.hyperdash";
 import type { UIOrder } from "./ui/updater";
-import { balanceStore, openOrdersStore, traderStore } from "./ui/updater";
+import { balanceStore, fillsStore, openOrdersStore, traderStore } from "./ui/updater";
 export const COIN_PRICE: Record<string, number> = {};
 export class HyperDash {
   walletAddress: string;
@@ -86,6 +86,7 @@ export class HyperDash {
             userFillsData.fills.map((x) => x.oid).join(", "),
           ); //, userFillsData.fills);
           this.orderFills = userFillsData.fills;
+          fillsStore.addFills(userFillsData.fills);
           return;
         default:
           console.log("🔻", msg.channel, msg);

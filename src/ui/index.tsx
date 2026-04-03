@@ -3,7 +3,12 @@
 import React, { useEffect, useState } from "react";
 import { render, Box, Text, useInput } from "ink";
 import type { Position, Balance } from "../api/types.hyperdash";
-import { traderStore, balanceStore, openOrdersStore } from "./updater";
+import {
+  traderStore,
+  balanceStore,
+  openOrdersStore,
+  fillsStore,
+} from "./updater";
 import { COIN_PRICE } from "../hyperdash";
 
 const fmt = (v?: string | number | null, d = 2) =>
@@ -102,9 +107,12 @@ const OpenOrdersPanel = () => {
       borderColor="cyan"
       padding={1}
       width={80}
-      height={12}
+      height={14}
     >
-      <Text bold>Open Orders</Text>
+      {/*@ts-ignore*/}
+      <Box marginLeft={"45%"} paddingBottom={1}>
+        <Text bold>Open Orders</Text>
+      </Box>
 
       <Text dimColor>
         {[
@@ -199,6 +207,75 @@ const Portfolio = ({ positions }: { positions: Position[] }) => {
   );
 };
 
+const FillsPanel = () => {
+  const [fills, setFills] = useState(fillsStore.getState());
+
+  //@ts-ignore
+  useEffect(() => {
+    return fillsStore.subscribe(() => setFills(fillsStore.getState()));
+  }, []);
+
+  const visible = fills.sort((a, b) => b.time - a.time).slice(0, 8);
+
+  return (
+    <Box
+      flexDirection="column"
+      borderStyle="round"
+      borderColor="red"
+      padding={1}
+      width={100}
+      height={14}
+    >
+      {/*@ts-ignore*/}
+      <Box paddingBottom={1} marginLeft={"45%"}>
+        <Text bold>Fills</Text>
+      </Box>
+
+      <Text dimColor>
+        {[
+          col("ASSET", 8, "left"),
+          col("DIR", 12),
+          col("SIZE", 12),
+          col("PRICE", 12),
+          col("VALUE", 16),
+          col("PNL", 10),
+          col("TIME", 12),
+        ].join(" ")}
+      </Text>
+
+      <Text dimColor>{"-".repeat(90)}</Text>
+
+      {visible.map((f, i) => {
+        const asset = f.coin.split(":").pop();
+        const size = Number(f.sz);
+        const price = Number(f.px);
+        const value = size * price;
+
+        const isOpen = f.dir.includes("Open");
+        const color = isOpen ? "green" : "red";
+
+        const time = new Date(f.time).toLocaleTimeString("en-US", {
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+
+        return (
+          <Text key={i}>
+            {col(asset || "-", 8, "left")}{" "}
+            <Text color={color}>{col(f.dir, 12)}</Text>{" "}
+            {col(`${fmt(size, 4)}`, 12)} {col(`$${fmt(price)}`, 12)}{" "}
+            {col(`$${fmt(value)}`, 16)}{" "}
+            <Text color={Number(f.closedPnl) >= 0 ? "green" : "red"}>
+              {col(f.closedPnl !== "0" ? `$${fmt(f.closedPnl)}` : "-", 10)}
+            </Text>{" "}
+            {col(time, 12)}
+          </Text>
+        );
+      })}
+    </Box>
+  );
+};
+
 const Live = () => (
   <Box
     //marginTop={1}
@@ -222,6 +299,7 @@ const App = () => {
 
   return (
     <Box flexDirection="column" padding={1}>
+      {/*@ts-ignore*/}
       <Box marginLeft={70}>
         <Text bold color="cyan">
           HyperRecon
@@ -239,7 +317,7 @@ const App = () => {
       </Box>
 
       <Box marginTop={1} gap={2}>
-        <Live />
+        <FillsPanel />
         <OpenOrdersPanel />
       </Box>
     </Box>
