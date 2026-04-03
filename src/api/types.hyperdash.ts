@@ -166,3 +166,35 @@ export interface OpenOrdersMessage {
   channel: "openOrders";
   data: OpenOrdersData;
 }
+
+
+export interface WsUserFills {
+  isSnapshot?: boolean;
+  user: string;
+  fills: Array<WsFill>;
+}
+
+export interface WsFill {
+  coin: string;
+  px: string; // price
+  sz: string; // size
+  side: string;
+  time: number;
+  startPosition: string;
+  dir: string; // used for frontend display
+  closedPnl: string;
+  hash: string; // L1 transaction hash
+  oid: number; // order id
+  crossed: boolean; // whether order crossed the spread (was taker)
+  fee: string; // negative means rebate
+  tid: number; // unique trade id
+  liquidation?: FillLiquidation;
+  feeToken: string; // the token the fee was paid in
+  builderFee?: string; // amount paid to builder, also included in fee
+}
+
+export interface FillLiquidation {
+  liquidatedUser?: string;
+  markPx: number;
+  method: "market" | "backstop";
+}

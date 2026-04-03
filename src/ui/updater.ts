@@ -1,5 +1,12 @@
 import type { Balance, Position, OpenOrder } from "../api/types.hyperdash";
 
+export type UIOrder = OpenOrder & {
+  changed?: {
+    size?: boolean;
+    price?: boolean;
+  };
+};
+
 type TraderState = {
   positions: Position[];
 };
@@ -9,6 +16,8 @@ let traderState: TraderState = {
 };
 
 let balanceState: Balance[] = [];
+
+let openOrdersState: UIOrder[] = [];
 
 const listeners = new Set<() => void>();
 
@@ -46,13 +55,10 @@ export const balanceStore = {
   subscribe: traderStore.subscribe,
 };
 
-
-let openOrdersState: OpenOrder[] = [];
-
 export const openOrdersStore = {
   getState: () => openOrdersState,
 
-  setState: (orders: OpenOrder[]) => {
+  setState: (orders: UIOrder[]) => {
     openOrdersState = orders;
     emit();
   },

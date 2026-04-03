@@ -130,7 +130,12 @@ const OpenOrdersPanel = () => {
           <Text key={o.oid}>
             {col(asset || "-", 12, "left")}{" "}
             <Text color={o.side === "B" ? "green" : "red"}>{col(side, 6)}</Text>{" "}
-            {col(`${fmt(size)} ${asset}`, 22)} {col(`$${fmt(price)}`, 12)}{" "}
+            <Text color={o.changed?.size ? "magenta" : undefined}>
+              {col(`${fmt(size, 6)} ${asset}`, 22)}
+            </Text>{" "}
+            <Text color={o.changed?.price ? "magenta" : undefined}>
+              {col(`$${fmt(price)}`, 12)}
+            </Text>{" "}
             {col(`$${fmt(value)}`, 16)}
           </Text>
         );

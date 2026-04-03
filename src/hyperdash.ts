@@ -8,11 +8,16 @@ import type {
   AllDexsClearinghouseStateMessage,
   OpenOrder,
   SpotBalance,
+  WsFill,
+  WsUserFills,
 } from "./api/types.hyperdash";
+import type { UIOrder } from "./ui/updater";
 import { balanceStore, openOrdersStore, traderStore } from "./ui/updater";
 export const COIN_PRICE: Record<string, number> = {};
 export class HyperDash {
   walletAddress: string;
+  orders: OpenOrder[] = [];
+  orderFills: WsFill[] = [];
   constructor(address: string) {
     this.walletAddress = address;
   }
@@ -36,10 +41,10 @@ export class HyperDash {
           for (const balance of spotData.spotState.balances) {
             str += `${balance.coin}: ${balance.total} (hold: ${balance.hold}) | token: ${balance.token} | entry: ${balance.entryNtl}\n`;
           }
-          //console.log("📊 Balance Updates:\n", str);
+          //console.log("Balance Updates:\n", str);
           break;
         case "pong":
-          //console.log("🏓 Pong received");
+          //console.log("Pong received");
           break;
         case "allDexsClearinghouseState":
           const clearinghouseData =
@@ -71,7 +76,16 @@ export class HyperDash {
           break;
         case "openOrders":
           const openOrdersData = msg.data.orders as OpenOrder[];
-          openOrdersStore.setState(openOrdersData);
+
+          this.inferenceOpenOrders(openOrdersData);
+          return;
+        case "userFills":
+          const userFillsData = msg.data as WsUserFills;
+          console.log(
+            "✅ New Fills:",
+            userFillsData.fills.map((x) => x.oid).join(", "),
+          ); //, userFillsData.fills);
+          this.orderFills = userFillsData.fills;
           return;
         default:
           console.log("🔻", msg.channel, msg);
@@ -120,5 +134,113 @@ export class HyperDash {
         dex: "ALL_DEXS",
       },
     });
+
+    ws.send({
+      method: "subscribe",
+      subscription: {
+        type: "userFills",
+        user: this.walletAddress,
+        aggregateByTime: true,
+      },
+    });
+  }
+  async inferenceOpenOrders(orders: OpenOrder[]) {
+    if (orders.length !== 0 && this.orders.length === 0) {
+      this.orders = [...orders];
+      openOrdersStore.setState(orders);
+      return;
+    }
+
+    const prevOrdersMap = new Map(this.orders.map((o) => [o.oid, o]));
+    const nextOrdersMap = new Map(orders.map((o) => [o.oid, o]));
+
+    const removedOrders: OpenOrder[] = [];
+
+    for (const [oid, order] of prevOrdersMap) {
+      if (!nextOrdersMap.has(oid)) {
+        removedOrders.push(order);
+      }
+    }
+
+    const percentDiff = (a: number, b: number) => {
+      if (a === 0 && b === 0) return 0;
+      return Math.abs(a - b) / Math.max(Math.abs(a), Math.abs(b));
+    };
+
+    const enrichedOrders: UIOrder[] = [];
+
+    for (const [oid, order] of nextOrdersMap) {
+      const existing = prevOrdersMap.get(oid);
+
+      if (existing) {
+        const sizeChanged = existing.sz !== order.sz;
+        const priceChanged = existing.limitPx !== order.limitPx;
+
+        if (sizeChanged || priceChanged) {
+          console.log(
+            `🔄 Updated Order: ${order.coin} | OID: ${oid} | Size: ${existing.sz} → ${order.sz} | Px: ${existing.limitPx} → ${order.limitPx}`,
+          );
+        }
+
+        enrichedOrders.push({
+          ...order,
+          changed: {
+            size: sizeChanged,
+            price: priceChanged,
+          },
+        });
+
+        continue;
+      }
+
+      // replace detection
+      const newPx = Number(order.limitPx);
+      const newSz = Number(order.sz);
+
+      let matchedOld: OpenOrder | null = null;
+
+      for (const old of removedOrders) {
+        if (old.coin === order.coin && old.side === order.side) {
+          const oldPx = Number(old.limitPx);
+          const oldSz = Number(old.sz);
+
+          const pxDiff = percentDiff(oldPx, newPx);
+          const szDiff = percentDiff(oldSz, newSz);
+
+          if (pxDiff <= 0.2 && szDiff <= 0.2) {
+            matchedOld = old;
+            break;
+          }
+        }
+      }
+
+      if (matchedOld) {
+        console.log(
+          `🔁 Replaced Order: ${order.coin} | ${matchedOld.oid} → ${oid}`,
+        );
+
+        enrichedOrders.push({
+          ...order,
+          changed: {
+            size: true,
+            price: true,
+          },
+        });
+
+        const idx = removedOrders.findIndex((o) => o.oid === matchedOld!.oid);
+        if (idx !== -1) removedOrders.splice(idx, 1);
+      } else {
+        console.log(`🆕 New Order: ${order.coin} | OID: ${oid}`);
+
+        enrichedOrders.push(order);
+      }
+    }
+
+    for (const order of removedOrders) {
+      console.log(`❌ Order Removed: ${order.coin} | OID: ${order.oid}`);
+    }
+
+    this.orders = [...orders];
+    openOrdersStore.setState(enrichedOrders);
   }
 }
